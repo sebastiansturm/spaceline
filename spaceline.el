@@ -512,13 +512,27 @@ render the empty space in the middle of the mode-line."
             (-zip (if (eq 'l side) segments (cons dummy segments))
                   (if (eq 'l side) (append (cdr segments) (list dummy)) segments))))))
 
+(defvar spaceline--cache (make-hash-table :test 'equal))
+(make-local-variable 'spaceline--cache)
+(defun spaceline--clear-cache () (clrhash spaceline--cache))
+(run-with-idle-timer 1 t #'spaceline--clear-cache)
+(add-hook 'window-configuration-change-hook #'spaceline--clear-cache)
+
 (defun spaceline--prepare (left right)
   "Prepare the modeline."
   (run-hooks 'spaceline-pre-hook)
   (let* ((active (powerline-selected-window-active))
          (line-face (spaceline--get-face 'line active))
-         (lhs (spaceline--prepare-any left 'l active line-face))
-         (rhs (spaceline--prepare-any right 'r active line-face)))
+         (leftkey (list evil-state left active (window-numbering-get-number) line-face))
+         (rightkey (list evil-state right active line-face))
+         (lhs (or (gethash leftkey spaceline--cache)
+                  (puthash leftkey
+                           (spaceline--prepare-any left 'l active line-face)
+                           spaceline--cache)))
+         (rhs (or (gethash rightkey spaceline--cache)
+                  (puthash rightkey
+                           (spaceline--prepare-any right 'r active line-face)
+                           spaceline--cache))))
     (concat (powerline-render lhs)
             (powerline-fill line-face (powerline-width rhs))
             (powerline-render rhs))))
